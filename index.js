@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 // const util = require('util');
 // console.log(util.inspect(compilation, {depth: 4}));
+
+var jsonHash = '';
 
 function webpackWpEntrypoints(options){
 
@@ -135,13 +138,25 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			return text;
 		}
 
+		/* check change < */
+		var jsonString = JSON.stringify({
+			scripts: scripts,
+			styles: styles,
+		}, null, 2);
+		var md5sum = crypto.createHash('md5');
+		md5sum.update(jsonString);
+		var hash = md5sum.digest('hex');
+		if(jsonHash == hash){
+			callback();
+			return false;
+		}
+		jsonHash = hash;
+		/* > check change */
+
 		var blob = '';
 
 		if(this.options.type == 'json'){
-			blob = JSON.stringify({
-				scripts: scripts,
-				styles: styles,
-			}, null, 2);
+			blob = jsonString;
 		}else{
 			blob += "<?php\n";
 			blob += '$wwe_template_directory_uri = !empty($wwe_template_directory_uri)? $wwe_template_directory_uri : get_template_directory_uri();\n';
