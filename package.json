@@ -1,0 +1,25 @@
+{
+  "name": "webpack-wordpress-entrypoints",
+  "version": "1.0.0",
+  "description": "Generates a file for including scripts",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mupic/webpack-wordpress-entrypoints.git"
+  },
+  "keywords": [
+    "webpack",
+    "wordpress",
+    "enqueue",
+    "json"
+  ],
+  "author": "Lopatin Daniil",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mupic/webpack-wordpress-entrypoints/issues"
+  },
+  "homepage": "https://github.com/mupic/webpack-wordpress-entrypoints#readme"
+}
