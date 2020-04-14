@@ -11,7 +11,7 @@ function webpackWpEntrypoints(options){
 	options = {
 		type: 'wp', //json
 		filename: 'wwe_entrypoints.php',
-		path: '',
+		path: './',
 		chunkOptions: {},
 		dependence: [],
 		dependenceCss: [],
@@ -22,6 +22,8 @@ function webpackWpEntrypoints(options){
 		adminCss: null,
 		theme: true,
 		themeCss: null,
+		excludeScripts: false,
+		excludeStyles: false,
 		...options
 	};
 
@@ -56,25 +58,32 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			let key = values[0];
 			let value = values[1];
 			let mainFileIndex = value.assets.length - 1;
-			let chunkOptions = typeof this.options.chunkOptions[key] != 'undefined'? this.options.chunkOptions[key] : false;
+			let chunkOptions = typeof this.options.chunkOptions[key] != 'undefined'? this.options.chunkOptions[key] : {};
 			let customDependence = chunkOptions && chunkOptions.dependence && chunkOptions.dependence.length && chunkOptions.dependence || [];
 			let customDependenceCss = chunkOptions && chunkOptions.dependenceCss && chunkOptions.dependenceCss.length && chunkOptions.dependenceCss || [];
+			let excludeScripts = chunkOptions && chunkOptions.excludeScripts || this.options.excludeScripts;
+			let excludeStyles = chunkOptions && chunkOptions.excludeStyles || this.options.excludeStyles;
 
-			let script = {
-				name: key,
-				file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
-				dependent: [],
-				customDependent: [].concat(this.options.dependence, customDependence),
-				async: chunkOptions.async === false || chunkOptions.async === true? chunkOptions.async : this.options.async,
-				defer: chunkOptions.defer === false || chunkOptions.defer === true? chunkOptions.defer : this.options.defer,
-				footer: chunkOptions.footer === false || chunkOptions.footer === true? chunkOptions.footer : this.options.footer,
-				admin: chunkOptions.admin === false || chunkOptions.admin === true? chunkOptions.admin : this.options.admin,
-				theme: chunkOptions.theme === false || chunkOptions.theme === true? chunkOptions.theme : this.options.theme,
-			};
-			if(script.async == true && script.defer == true)
-				script.defer = false;
+			if(chunkOptions === false || excludeScripts && excludeStyles)
+				return;
 
-			scripts.push(script);
+			if(!excludeScripts){
+				let script = {
+					name: key,
+					file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
+					dependent: [],
+					customDependent: [].concat(this.options.dependence, customDependence),
+					async: chunkOptions.async === false || chunkOptions.async === true? chunkOptions.async : this.options.async,
+					defer: chunkOptions.defer === false || chunkOptions.defer === true? chunkOptions.defer : this.options.defer,
+					footer: chunkOptions.footer === false || chunkOptions.footer === true? chunkOptions.footer : this.options.footer,
+					admin: chunkOptions.admin === false || chunkOptions.admin === true? chunkOptions.admin : this.options.admin,
+					theme: chunkOptions.theme === false || chunkOptions.theme === true? chunkOptions.theme : this.options.theme,
+				};
+				if(script.async == true && script.defer == true)
+					script.defer = false;
+
+				scripts.push(script);
+			}
 
 			value.assets.forEach((file, i) => {
 				if(i == mainFileIndex)
@@ -83,21 +92,23 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				file = path.join(output, file).replace(/\\/g, '/');
 
 				if(/\.js$/i.test(file)){
-					script.dependent.push({
-						file: file,
-						name: path.basename(file, '.js'),
-						customDependent: this.options.dependence && this.options.dependence.length && this.options.dependence || [],
-						defer: script.defer,
-						footer: script.footer,
-					});
+					if(!excludeScripts)
+						script.dependent.push({
+							file: file,
+							name: path.basename(file, '.js'),
+							customDependent: this.options.dependence && this.options.dependence.length && this.options.dependence || [],
+							defer: script.defer,
+							footer: script.footer,
+						});
 				}else if(/\.css$/i.test(file)){
-					styles.push({
-						file: file,
-						name: path.basename(file, '.css'),
-						customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
-						admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : this.options.adminCss,
-						theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : this.options.themeCss,
-					});
+					if(!excludeStyles)
+						styles.push({
+							file: file,
+							name: path.basename(file, '.css'),
+							customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
+							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : this.options.adminCss,
+							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : this.options.themeCss,
+						});
 				}
 
 			});

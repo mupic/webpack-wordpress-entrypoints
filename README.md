@@ -27,7 +27,8 @@ Generates a file for including scripts
 				extractSass,
 				new webpackWpEntrypoints({
 					type: 'wp', //Default: wp. If you specify "json" here, the output will be in json format
-					filename: 'wwe_entrypoints.php', //default
+					path: './', //Main directory where are the theme of the site. Default: './';
+					filename: 'wwe_entrypoints.php', //You can specify the path to save the file. The file will be saved in the directory: path + filename. Default: wwe_entrypoints.php
 					chunkOptions: {
 						"first": {
 							dependence: ['second'], //Sets the dependency of this script on another
@@ -39,6 +40,8 @@ Generates a file for including scripts
 							adminCss: null, //Include the style to the wordpress admin panel. Default: same as admin
 							theme: true, //Include the script to the site theme
 							themeCss: null, //Include the style to the site theme. Default: same as theme
+							excludeScripts: false, //true - Excludes script output. Inherits the meaning of the parent.
+							excludeStyles: false, //true - Excludes style output. Inherits the meaning of the parent.
 						},
 					},
 					dependence: ['jquery'], //Sets the dependence of all scripts on the specified. Default: [].
@@ -50,13 +53,14 @@ Generates a file for including scripts
 					adminCss: null, //Include styles to the wordpress admin panel. Default: same as admin
 					theme: true, //Include scripts to the site theme. Default: true.
 					themeCss: null, //Include styles to the site theme. Default: same as theme
-					
+					excludeScripts: false, //true - Excludes script output
+					excludeStyles: false, //true - Excludes style output
 				}),
 			],
 			optimization: {
 				splitChunks: {
 					chunks(chunk) {
-						return chunk.name !== 'first'; //exclude
+						return chunk.name !== 'first'; //Excludes the creation of chunks for this output.
 					},
 					minSize: 30000,
 					maxAsyncRequests: 20,
