@@ -67,8 +67,10 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			if(chunkOptions === false || excludeScripts && excludeStyles)
 				return;
 
+			let script = {};
+
 			if(!excludeScripts){
-				let script = {
+				script = {
 					name: key,
 					file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
 					dependent: [],
