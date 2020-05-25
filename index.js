@@ -45,24 +45,27 @@ function webpackWpEntrypoints(options){
 
 webpackWpEntrypoints.prototype.apply = function(compiler){
 	compiler.hooks.done.tapAsync('webpackWpEntrypoints', (compilation, callback) => {
-		var compilationToJson = compilation.toJson();
-		var pathToSave = this.options.path;
-		var nameToSave = this.options.filename;
+		let compilationToJson = compilation.toJson();
+		let pathToSave = this.options.path;
+		let nameToSave = this.options.filename;
 		const output = path.relative(pathToSave, compilationToJson.outputPath);
 		const destination = path.join(pathToSave, nameToSave);
 
-		var scripts = [];
-		var styles = [];
+		let scripts = [];
+		let styles = [];
 
-		Object.entries(compilationToJson.entrypoints).forEach((values) => {
+		let collectedStyles = {};
+		Object.entries(compilationToJson.entrypoints).forEach((values, pointsIndex) => {
 			let key = values[0];
-			let value = values[1];
+			let value = JSON.parse(JSON.stringify(values[1]));
 			let mainFileIndex = value.assets.length - 1;
 			let chunkOptions = typeof this.options.chunkOptions[key] != 'undefined'? this.options.chunkOptions[key] : {};
 			let customDependence = chunkOptions && chunkOptions.dependence && chunkOptions.dependence.length && chunkOptions.dependence || [];
 			let customDependenceCss = chunkOptions && chunkOptions.dependenceCss && chunkOptions.dependenceCss.length && chunkOptions.dependenceCss || [];
 			let excludeScripts = chunkOptions && chunkOptions.excludeScripts || this.options.excludeScripts;
 			let excludeStyles = chunkOptions && chunkOptions.excludeStyles || this.options.excludeStyles;
+			let registerHandleScript = chunkOptions && chunkOptions.registerHandleScript || '';
+			let registerHandleStyle = chunkOptions && chunkOptions.registerHandleStyle || '';
 
 			if(chunkOptions === false || excludeScripts && excludeStyles)
 				return;
@@ -71,7 +74,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 			if(!excludeScripts){
 				script = {
-					name: key,
+					name: (registerHandleScript? registerHandleScript : false) || key,
 					file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
 					dependent: [],
 					customDependent: [].concat(this.options.dependence, customDependence),
@@ -94,23 +97,35 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				file = path.join(output, file).replace(/\\/g, '/');
 
 				if(/\.js$/i.test(file)){
-					if(!excludeScripts)
+					if(!excludeScripts){
 						script.dependent.push({
-							file: file,
-							name: path.basename(file, '.js'),
+							file,
+							name: (registerHandleScript? registerHandleScript + '~' + pointsIndex + '~' + i : false) || path.basename(file, '.js'),
 							customDependent: this.options.dependence && this.options.dependence.length && this.options.dependence || [],
 							defer: script.defer,
 							footer: script.footer,
 						});
+					}
 				}else if(/\.css$/i.test(file)){
-					if(!excludeStyles)
+					if(!excludeStyles){
+						if(typeof collectedStyles[key] == 'undefined')
+							collectedStyles[key] = [];
+
+						let name = (registerHandleStyle? registerHandleStyle + (collectedStyles[key].length? '~' + i : '') : false) || path.basename(file, '.css');
+
+						collectedStyles[key].push({
+							file,
+							name,
+						});
+
 						styles.push({
-							file: file,
-							name: path.basename(file, '.css'),
+							file,
+							name,
 							customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
 							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : this.options.adminCss,
 							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : this.options.themeCss,
 						});
+					}
 				}
 
 			});
@@ -132,6 +147,18 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				text += "wp_register_script('"+script.name+"', $wwe_template_directory_uri . '/"+script.file+"', array("+depString+"), null, " + script.footer + " );\n";
 			});
 			styles.forEach((style) => {
+				if(style.customDependent && style.customDependent.length){
+					style.customDependent.forEach((depName, i) => {
+						if(typeof collectedStyles[depName] != 'undefined'){
+							delete style.customDependent[i];
+							collectedStyles[depName].forEach((styleName) => {
+								style.customDependent.push(styleName.name);
+							});
+						}
+					});
+
+					style.customDependent = style.customDependent.filter((v) => v);
+				}
 				let depString = (() => style.customDependent && style.customDependent.length && "'" + style.customDependent.join("','") + "'" || '')();
 				text += "wp_register_style('"+style.name+"', $wwe_template_directory_uri . '/"+style.file+"', array(" + depString + "), null );\n";
 			});

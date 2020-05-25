@@ -31,6 +31,8 @@ Generates a file for including scripts
 					filename: 'wwe_entrypoints.php', //You can specify the path to save the file. The file will be saved in the directory: path + filename. Default: wwe_entrypoints.php
 					chunkOptions: {
 						"first": {
+						    registerHandleScript: '', //Used for the first argument to the wp_register_script function.
+                            registerHandleStyle: '', //Used for the first argument to the wp_register_style function.
 							dependence: ['second'], //Sets the dependency of this script on another
 							dependenceCss: [], //Sets the dependency of this style on another
 							async: true, //Set the async attribute for this file only.
