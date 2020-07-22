@@ -40,6 +40,8 @@ Generates a file for including scripts
 							footer: true, //Put the script at the bottom of the wordpress site
 							admin: true, //Include the script to the wordpress admin panel
 							adminCss: null, //Include the style to the wordpress admin panel. Default: same as admin
+							gutenberg: false, //Include the script to the gutenberg editor
+                            gutenbergCss: name, //Include the style to the gutenberg editor. Default: same as gutenberg
 							theme: true, //Include the script to the site theme
 							themeCss: null, //Include the style to the site theme. Default: same as theme
 							excludeScripts: false, //true - Excludes script output. Inherits the meaning of the parent.
@@ -53,6 +55,8 @@ Generates a file for including scripts
 					footer: true, //Put scripts at the bottom of the wordpress site. Default: true.
 					admin: false, //Include scripts to the wordpress admin panel. Default: false.
 					adminCss: null, //Include styles to the wordpress admin panel. Default: same as admin
+                    gutenberg: false, //Include the script to the gutenberg editor
+                    gutenbergCss: name, //Include the style to the gutenberg editor. Default: same as gutenberg
 					theme: true, //Include scripts to the site theme. Default: true.
 					themeCss: null, //Include styles to the site theme. Default: same as theme
 					excludeScripts: false, //true - Excludes script output
@@ -74,139 +78,109 @@ Generates a file for including scripts
 ## Output result
 ### type=wp
 	<?php
-	$wwe_template_directory_uri = !empty($wwe_template_directory_uri)? $wwe_template_directory_uri : get_template_directory_uri();
-	wp_register_script('first', $wwe_template_directory_uri . '/dist/js/first.js', array('jquery','second'), null, true );
-	wp_register_script('vendors~last~second', $wwe_template_directory_uri . '/dist/js/vendors~last~second.js', array('jquery'), null, true );
-	wp_register_script('vendors~second', $wwe_template_directory_uri . '/dist/js/vendors~second.js', array('jquery'), null, true );
-	wp_register_script('second', $wwe_template_directory_uri . '/dist/js/second.js', array('vendors~last~second','vendors~second','jquery'), null, true );
-	wp_register_script('vendors~last~second', $wwe_template_directory_uri . '/dist/js/vendors~last~second.js', array('jquery'), null, true );
-	wp_register_script('vendors~last', $wwe_template_directory_uri . '/dist/js/vendors~last.js', array('jquery'), null, true );
-	wp_register_script('last', $wwe_template_directory_uri . '/dist/js/last.js', array('vendors~last~second','vendors~last','jquery'), null, true );
-	wp_register_style('last', $wwe_template_directory_uri . '/dist/css/last.css', array(), null );
-	add_filter( "script_loader_tag", function( $tag, $handle ){
-		if($handle == "first"){
-			return str_replace( " src", " async src", $tag );
-		}
-		if($handle == "second"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		if($handle == "vendors~last~second"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		if($handle == "vendors~second"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		if($handle == "last"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		if($handle == "vendors~last~second"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		if($handle == "vendors~last"){
-			return str_replace( " src", " defer src", $tag );
-		}
-		return $tag;
-	}, 10, 2 );
-	add_action( 'wp_enqueue_scripts', function(){
-		wp_enqueue_script('first');
-		wp_enqueue_script('second');
-		wp_enqueue_script('last');
-		wp_enqueue_style('last');
-	});
-	add_action( 'admin_enqueue_scripts', function(){
-		wp_enqueue_script('first');
-	});
+    $wwe_template_directory_uri = !empty($wwe_template_directory_uri)? $wwe_template_directory_uri : get_template_directory_uri();
+    add_filter( "script_loader_tag", function( $tag, $handle ){
+    	if($handle == "build"){
+    		return str_replace( " src", " defer src", $tag );
+    	}
+    	if($handle == "gutenberg.js.bundle"){
+    		return str_replace( " src", " defer src", $tag );
+    	}
+    	if($handle == "gutenberg"){
+    		return str_replace( " src", " defer src", $tag );
+    	}
+    	return $tag;
+    }, 10, 2 );
+    add_action( 'wp_enqueue_scripts', function() use($wwe_template_directory_uri){
+    	do_action('wwe_wp_enqueue_scripts_before');
+    	wp_register_script('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/js/gutenberg.js.bundle.js', array('jquery'), null, true );
+    	wp_register_script('build', $wwe_template_directory_uri . '/_dist/js/build.ddca7998b98c837c58eb.js', array('gutenberg.js.bundle','jquery'), null, true );
+    	wp_enqueue_script('build');
+    	wp_register_style('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/css/gutenberg.js.bundle.css', array(), null );
+    	wp_register_style('build.ddca7998b98c837c58eb', $wwe_template_directory_uri . '/_dist/css/build.ddca7998b98c837c58eb.css', array(), null );
+    	wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), null );
+    	wp_enqueue_style('gutenberg.js.bundle');
+    	wp_enqueue_style('build.ddca7998b98c837c58eb');
+    	wp_enqueue_style('gutenberg');
+    	do_action('wwe_wp_enqueue_scripts_after');
+    });
+    add_action( 'enqueue_block_editor_assets', function() use($wwe_template_directory_uri){
+    	do_action('wwe_enqueue_block_editor_assets_before');
+    	wp_register_script('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/js/gutenberg.ddca7998b98c837c58eb.js', array('jquery'), null, true );
+    	wp_enqueue_script('gutenberg');
+    	wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), null );
+    	wp_enqueue_style('gutenberg');
+    	do_action('wwe_enqueue_block_editor_assets_after');
+    });
+
 
 
 ### type=json
 	{
-		"scripts": [
-			{
-				"name": "first",
-				"file": "dist/js/first.js",
-				"dependent": [],
-				"customDependent": [
-					"jquery",
-					"second"
-				],
-				"async": true,
-				"defer": false,
-				"footer": true,
-				"admin": true,
-				"theme": true
-			},
-			{
-				"name": "second",
-				"file": "dist/js/second.js",
-				"dependent": [
-					{
-						"file": "dist/js/vendors~last~second.js",
-						"name": "vendors~last~second",
-						"customDependent": [
-							"jquery"
-						],
-						"defer": true,
-						"footer": true
-					},
-					{
-						"file": "dist/js/vendors~second.js",
-						"name": "vendors~second",
-						"customDependent": [
-							"jquery"
-						],
-						"defer": true,
-						"footer": true
-					}
-				],
-				"customDependent": [
-					"jquery"
-				],
-				"async": false,
-				"defer": true,
-				"footer": true,
-				"admin": false,
-				"theme": true
-			},
-			{
-				"name": "last",
-				"file": "dist/js/last.js",
-				"dependent": [
-					{
-						"file": "dist/js/vendors~last~second.js",
-						"name": "vendors~last~second",
-						"customDependent": [
-							"jquery"
-						],
-						"defer": true,
-						"footer": true
-					},
-					{
-						"file": "dist/js/vendors~last.js",
-						"name": "vendors~last",
-						"customDependent": [
-							"jquery"
-						],
-						"defer": true,
-						"footer": true
-					}
-				],
-				"customDependent": [
-					"jquery"
-				],
-				"async": false,
-				"defer": true,
-				"footer": true,
-				"admin": false,
-				"theme": true
-			}
-		],
-		"styles": [
-			{
-				"file": "dist/css/last.css",
-				"name": "last",
-				"customDependent": [],
-				"admin": false,
-				"theme": true
-			}
-		]
-	}
+      "scripts": [
+        {
+          "name": "build",
+          "file": "_dist/js/build.ddca7998b98c837c58eb.js",
+          "dependent": [
+            {
+              "file": "_dist/js/gutenberg.js.bundle.js",
+              "name": "gutenberg.js.bundle",
+              "customDependent": [
+                "jquery"
+              ],
+              "defer": true,
+              "footer": true
+            }
+          ],
+          "customDependent": [
+            "jquery"
+          ],
+          "async": false,
+          "defer": true,
+          "footer": true,
+          "admin": false,
+          "gutenberg": false,
+          "theme": true
+        },
+        {
+          "name": "gutenberg",
+          "file": "theme_plugins/gutenberg/dist/js/gutenberg.ddca7998b98c837c58eb.js",
+          "dependent": [],
+          "customDependent": [
+            "jquery"
+          ],
+          "async": false,
+          "defer": true,
+          "footer": true,
+          "admin": false,
+          "gutenberg": true,
+          "theme": false
+        }
+      ],
+      "styles": [
+        {
+          "file": "_dist/css/gutenberg.js.bundle.css",
+          "name": "gutenberg.js.bundle",
+          "customDependent": [],
+          "admin": false,
+          "gutenberg": false,
+          "theme": true
+        },
+        {
+          "file": "_dist/css/build.ddca7998b98c837c58eb.css",
+          "name": "build.ddca7998b98c837c58eb",
+          "customDependent": [],
+          "admin": false,
+          "gutenberg": false,
+          "theme": true
+        },
+        {
+          "file": "theme_plugins/gutenberg/dist/css/gutenberg.css",
+          "name": "gutenberg",
+          "customDependent": [],
+          "admin": false,
+          "gutenberg": true,
+          "theme": true
+        }
+      ]
+    }

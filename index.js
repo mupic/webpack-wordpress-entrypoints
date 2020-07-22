@@ -4,7 +4,7 @@ const crypto = require('crypto');
 // const util = require('util');
 // console.log(util.inspect(compilation, {depth: 4}));
 
-var jsonHash = '';
+let jsonHash = '';
 
 function webpackWpEntrypoints(options){
 
@@ -20,11 +20,13 @@ function webpackWpEntrypoints(options){
 		footer: true,
 		admin: false,
 		adminCss: null,
+		gutenberg: false,
+		gutenbergCss: null,
 		theme: true,
 		themeCss: null,
 		excludeScripts: false,
 		excludeStyles: false,
-		...options
+		...options,
 	};
 
 	if(options.async == true && options.defer == true)
@@ -33,6 +35,8 @@ function webpackWpEntrypoints(options){
 		options.themeCss = options.theme;
 	if(options.adminCss === null)
 		options.adminCss = options.admin;
+	if(options.gutenbergCss === null)
+		options.gutenbergCss = options.gutenberg;
 
 	if(!options.filename){
 		throw new Error("filename property is required on options");
@@ -82,6 +86,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					defer: chunkOptions.defer === false || chunkOptions.defer === true? chunkOptions.defer : this.options.defer,
 					footer: chunkOptions.footer === false || chunkOptions.footer === true? chunkOptions.footer : this.options.footer,
 					admin: chunkOptions.admin === false || chunkOptions.admin === true? chunkOptions.admin : this.options.admin,
+					gutenberg: chunkOptions.gutenberg === false || chunkOptions.gutenberg === true? chunkOptions.gutenberg : this.options.gutenberg,
 					theme: chunkOptions.theme === false || chunkOptions.theme === true? chunkOptions.theme : this.options.theme,
 				};
 				if(script.async == true && script.defer == true)
@@ -122,8 +127,9 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 							file,
 							name,
 							customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
-							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : this.options.adminCss,
-							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : this.options.themeCss,
+							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : (chunkOptions.admin || this.options.adminCss),
+							gutenberg: chunkOptions.gutenbergCss === false || chunkOptions.gutenbergCss === true? chunkOptions.gutenbergCss : (chunkOptions.gutenberg || this.options.gutenbergCss),
+							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : (chunkOptions.theme || this.options.themeCss),
 						});
 					}
 				}
@@ -131,12 +137,33 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			});
 		});
 
-		function generateRegister(admin = false){
-			var text = '';
+		function generateRegister(type = 'theme'){
+			let text = '';
+
+			return text;
+		}
+
+		function enqueue_scripts(type = 'theme'){ //theme, admin, gutenberg
+			let text = '';
+			let isEnable = (obj) => {
+				switch(type){
+					case 'theme':
+						return obj.theme;
+					case 'admin':
+						return obj.admin;
+					case 'gutenberg':
+						return obj.gutenberg;
+				}
+			};
+			/* scripts */
 			scripts.forEach((script) => {
+				if(!isEnable(script))
+					return;
 				script.dependent.forEach((depScript) => {
+					if(!isEnable(script))
+						return;
 					let depString = (() => depScript.customDependent && depScript.customDependent.length && "'" + depScript.customDependent.join("','") + "'" || '')();
-					text += "wp_register_script('"+depScript.name+"', $wwe_template_directory_uri . '/"+depScript.file+"', array(" + depString + "), null, " + depScript.footer + " );\n";
+					text += "\twp_register_script('" + depScript.name + "', $wwe_template_directory_uri . '/" + depScript.file + "', array(" + depString + "), null, " + depScript.footer + " );\n";
 				});
 				let depString = (() => {
 					let arr = [];
@@ -144,9 +171,18 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					arr = arr.concat(script.customDependent);
 					return "'" + arr.join("','") + "'";
 				})();
-				text += "wp_register_script('"+script.name+"', $wwe_template_directory_uri . '/"+script.file+"', array("+depString+"), null, " + script.footer + " );\n";
+				text += "\twp_register_script('" + script.name + "', $wwe_template_directory_uri . '/" + script.file + "', array(" + depString + "), null, " + script.footer + " );\n";
 			});
+			scripts.forEach((script) => {
+				if(!isEnable(script))
+					return;
+				text += "\twp_enqueue_script('" + script.name + "');\n";
+			});
+			/*> scripts */
+			/* styles */
 			styles.forEach((style) => {
+				if(!isEnable(style))
+					return;
 				if(style.customDependent && style.customDependent.length){
 					style.customDependent.forEach((depName, i) => {
 						if(typeof collectedStyles[depName] != 'undefined'){
@@ -160,32 +196,25 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					style.customDependent = style.customDependent.filter((v) => v);
 				}
 				let depString = (() => style.customDependent && style.customDependent.length && "'" + style.customDependent.join("','") + "'" || '')();
-				text += "wp_register_style('"+style.name+"', $wwe_template_directory_uri . '/"+style.file+"', array(" + depString + "), null );\n";
-			});
-			return text;
-		}
-
-		function enqueue_scripts(admin = false){
-			var text = '';
-			scripts.forEach((script) => {
-				if(!admin && script.theme || admin && script.admin)
-					text += "\twp_enqueue_script('" + script.name + "');\n";
+				text += "\twp_register_style('" + style.name + "', $wwe_template_directory_uri . '/" + style.file + "', array(" + depString + "), null );\n";
 			});
 			styles.forEach((style) => {
-				if(!admin && style.theme || admin && style.admin)
-					text += "\twp_enqueue_style('" + style.name + "');\n";
+				if(!isEnable(style))
+					return;
+				text += "\twp_enqueue_style('" + style.name + "');\n";
 			});
+			/*> styles */
 			return text;
 		}
 
 		/* check change < */
-		var jsonString = JSON.stringify({
+		let jsonString = JSON.stringify({
 			scripts: scripts,
 			styles: styles,
 		}, null, 2);
-		var md5sum = crypto.createHash('md5');
+		let md5sum = crypto.createHash('md5');
 		md5sum.update(jsonString);
-		var hash = md5sum.digest('hex');
+		let hash = md5sum.digest('hex');
 		if(jsonHash == hash){
 			callback();
 			return false;
@@ -193,14 +222,13 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 		jsonHash = hash;
 		/* > check change */
 
-		var blob = '';
+		let blob = '';
 
 		if(this.options.type == 'json'){
 			blob = jsonString;
 		}else{
 			blob += "<?php\n";
 			blob += '$wwe_template_directory_uri = !empty($wwe_template_directory_uri)? $wwe_template_directory_uri : get_template_directory_uri();\n';
-			blob += generateRegister();
 
 			let asyncDefrSrc = '';
 			scripts.forEach((script) => {
@@ -224,19 +252,35 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				blob += '}, 10, 2 );\n';
 			}
 
-			blob += "add_action( 'wp_enqueue_scripts', function(){\n";
-			blob += enqueue_scripts();
-			blob += "});\n";
+			let blobTheme = enqueue_scripts('theme');
+			if(blobTheme){
+				blob += "add_action( 'wp_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
+				blob += "\tdo_action('wwe_wp_enqueue_scripts_before');\n";
+				blob += blobTheme;
+				blob += "\tdo_action('wwe_wp_enqueue_scripts_after');\n";
+				blob += "});\n";
+			}
 
-			let blobAdmin = enqueue_scripts(true);
+			let blobAdmin = enqueue_scripts('admin');
 			if(blobAdmin){
-				blob += "add_action( 'admin_enqueue_scripts', function(){\n";
+				blob += "add_action( 'admin_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
+				blob += "\tdo_action('wwe_admin_enqueue_scripts_before');\n";
 				blob += blobAdmin;
+				blob += "\tdo_action('wwe_admin_enqueue_scripts_after');\n";
+				blob += "});\n";
+			}
+
+			let blobGutenberg = enqueue_scripts('gutenberg');
+			if(blobGutenberg){
+				blob += "add_action( 'enqueue_block_editor_assets', function() use($wwe_template_directory_uri){\n";
+				blob += "\tdo_action('wwe_enqueue_block_editor_assets_before');\n";
+				blob += blobGutenberg;
+				blob += "\tdo_action('wwe_enqueue_block_editor_assets_after');\n";
 				blob += "});\n";
 			}
 		}
 
-		fs.writeFile(destination, blob, {encoding: 'utf8', flag: 'w'}, function (err) {
+		fs.writeFile(destination, blob, {encoding: 'utf8', flag: 'w'}, function(err){
 			if(err){
 				console.error(`Failed to open file '${destination}' with error '${err.toString()}'; quitting.`);
 			}
