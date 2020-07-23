@@ -127,9 +127,9 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 							file,
 							name,
 							customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
-							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : (chunkOptions.admin || this.options.adminCss),
-							gutenberg: chunkOptions.gutenbergCss === false || chunkOptions.gutenbergCss === true? chunkOptions.gutenbergCss : (chunkOptions.gutenberg || this.options.gutenbergCss),
-							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : (chunkOptions.theme || this.options.themeCss),
+							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : (chunkOptions.admin !== null? chunkOptions.admin : this.options.adminCss),
+							gutenberg: chunkOptions.gutenbergCss === false || chunkOptions.gutenbergCss === true? chunkOptions.gutenbergCss : (chunkOptions.gutenberg !== null? chunkOptions.gutenberg : this.options.gutenbergCss),
+							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : (chunkOptions.theme !== null? chunkOptions.theme : this.options.themeCss),
 						});
 					}
 				}
