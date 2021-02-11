@@ -26,6 +26,19 @@ function webpackWpEntrypoints(options){
 		themeCss: null,
 		excludeScripts: false,
 		excludeStyles: false,
+		customFiles: {
+			js: [{
+				src: false, //If set to false, it will not be generated.
+				handle: false, //If not set, a hash from src will be generated.
+				dependence: undefined, //Inherits the value of the main option.
+				gutenberg: null, //Inherits the value of the main option.
+				admin: null, //Inherits the value of the main option.
+				theme: null, //Inherits the value of the main option.
+				async: null, //Inherits the value of the main option.
+				footer: null, //Inherits the value of the main option.
+			}],
+			css: [],
+		},
 		...options,
 	};
 
@@ -48,6 +61,7 @@ function webpackWpEntrypoints(options){
 }
 
 webpackWpEntrypoints.prototype.apply = function(compiler){
+	let self = this;
 	compiler.hooks.done.tapAsync('webpackWpEntrypoints', (compilation, callback) => {
 		let compilationToJson = compilation.toJson();
 		let pathToSave = this.options.path;
@@ -58,14 +72,49 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 		let scripts = [];
 		let styles = [];
 
+		let customFilesEach = (type) => (obj) => {
+			if(!obj.src)
+				return;
+
+			let name = obj.handle;
+			if(!name){
+				let md5sum = crypto.createHash('md5');
+				md5sum.update(obj.src);
+				name = md5sum.digest('hex');
+			}
+
+			let dependence = typeof obj.dependence != 'undefined' && (Array.isArray(obj.dependence)? obj.dependence : []) || undefined;
+
+			let script = {
+				name: name,
+				file: obj.src,
+				dependent: [], //The scripts on which the main depends
+				customDependent: typeof dependence != 'undefined'? dependence : (type == 'js'? this.options.dependence : this.options.dependenceCss),
+				async: isBool(obj.async)? obj.async : this.options.async,
+				defer: isBool(obj.defer)? obj.defer : this.options.defer,
+				footer: isBool(obj.footer)? obj.footer : this.options.footer,
+				admin: isBool(obj.admin)? obj.admin : this.options.admin,
+				gutenberg: isBool(obj.gutenberg)? obj.gutenberg : this.options.gutenberg,
+				theme: isBool(obj.theme)? obj.theme : this.options.theme,
+			};
+			if(script.async == true && script.defer == true)
+				script.defer = false;
+
+			if(type == 'js'){
+				scripts.push(script);
+			}else{
+				styles.push(script);
+			}
+		};
+
 		let collectedStyles = {};
 		Object.entries(compilationToJson.entrypoints).forEach((values, pointsIndex) => {
 			let key = values[0];
 			let value = JSON.parse(JSON.stringify(values[1]));
 			let mainFileIndex = value.assets.length - 1;
 			let chunkOptions = typeof this.options.chunkOptions[key] != 'undefined'? this.options.chunkOptions[key] : {};
-			let customDependence = chunkOptions && chunkOptions.dependence && chunkOptions.dependence.length && chunkOptions.dependence || [];
-			let customDependenceCss = chunkOptions && chunkOptions.dependenceCss && chunkOptions.dependenceCss.length && chunkOptions.dependenceCss || [];
+			let customDependence = chunkOptions && typeof chunkOptions.dependence != 'undefined' && (Array.isArray(chunkOptions.dependence)? chunkOptions.dependence : []) || undefined;
+			let customDependenceCss = chunkOptions && typeof chunkOptions.dependenceCss != 'undefined' && (Array.isArray(chunkOptions.dependenceCss)? chunkOptions.dependenceCss : []) || undefined;
 			let excludeScripts = chunkOptions && chunkOptions.excludeScripts || this.options.excludeScripts;
 			let excludeStyles = chunkOptions && chunkOptions.excludeStyles || this.options.excludeStyles;
 			let registerHandleScript = chunkOptions && chunkOptions.registerHandleScript || '';
@@ -78,16 +127,16 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 			if(!excludeScripts){
 				script = {
-					name: (registerHandleScript? registerHandleScript : false) || key,
+					name: registerHandleScript || key,
 					file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
-					dependent: [],
-					customDependent: [].concat(this.options.dependence, customDependence),
-					async: chunkOptions.async === false || chunkOptions.async === true? chunkOptions.async : this.options.async,
-					defer: chunkOptions.defer === false || chunkOptions.defer === true? chunkOptions.defer : this.options.defer,
-					footer: chunkOptions.footer === false || chunkOptions.footer === true? chunkOptions.footer : this.options.footer,
-					admin: chunkOptions.admin === false || chunkOptions.admin === true? chunkOptions.admin : this.options.admin,
-					gutenberg: chunkOptions.gutenberg === false || chunkOptions.gutenberg === true? chunkOptions.gutenberg : this.options.gutenberg,
-					theme: chunkOptions.theme === false || chunkOptions.theme === true? chunkOptions.theme : this.options.theme,
+					dependent: [], //The scripts on which the main depends
+					customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependence,
+					async: isBool(chunkOptions.async)? chunkOptions.async : this.options.async,
+					defer: isBool(chunkOptions.defer)? chunkOptions.defer : this.options.defer,
+					footer: isBool(chunkOptions.footer)? chunkOptions.footer : this.options.footer,
+					admin: isBool(chunkOptions.admin)? chunkOptions.admin : this.options.admin,
+					gutenberg: isBool(chunkOptions.gutenberg)? chunkOptions.gutenberg : this.options.gutenberg,
+					theme: isBool(chunkOptions.theme)? chunkOptions.theme : this.options.theme,
 				};
 				if(script.async == true && script.defer == true)
 					script.defer = false;
@@ -95,6 +144,8 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				scripts.push(script);
 			}
 
+			let script_i = 0;
+			let style_i = 0;
 			value.assets.forEach((file, i) => {
 				if(i == mainFileIndex)
 					return;
@@ -105,7 +156,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					if(!excludeScripts){
 						script.dependent.push({
 							file,
-							name: (registerHandleScript? registerHandleScript + '~' + pointsIndex + '~' + i : false) || path.basename(file, '.js'),
+							name: (registerHandleScript? registerHandleScript + '~' + pointsIndex + '~' + script_i++ : false) || path.basename(file, '.js'),
 							customDependent: this.options.dependence && this.options.dependence.length && this.options.dependence || [],
 							defer: script.defer,
 							footer: script.footer,
@@ -116,17 +167,17 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 						if(typeof collectedStyles[key] == 'undefined')
 							collectedStyles[key] = [];
 
-						let name = (registerHandleStyle? registerHandleStyle + (collectedStyles[key].length? '~' + i : '') : false) || path.basename(file, '.css');
+						let name = (registerHandleStyle? registerHandleStyle + (collectedStyles[key].length? '~' + style_i++ : '') : false) || path.basename(file, '.css');
 
 						collectedStyles[key].push({
 							file,
 							name,
 						});
-console.log(chunkOptions.theme);
+
 						styles.push({
 							file,
 							name,
-							customDependent: [].concat(this.options.dependenceCss, customDependenceCss),
+							customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependenceCss,
 							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : (chunkOptions.admin !== null && chunkOptions.admin !== undefined? chunkOptions.admin : this.options.adminCss),
 							gutenberg: chunkOptions.gutenbergCss === false || chunkOptions.gutenbergCss === true? chunkOptions.gutenbergCss : (chunkOptions.gutenberg !== null && chunkOptions.gutenberg !== undefined? chunkOptions.gutenberg : this.options.gutenbergCss),
 							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : (chunkOptions.theme !== null && chunkOptions.theme !== undefined? chunkOptions.theme : this.options.themeCss),
@@ -156,12 +207,14 @@ console.log(chunkOptions.theme);
 				}
 			};
 			/* scripts */
+			self.options.customFiles && self.options.customFiles.js && self.options.customFiles.js.length && self.options.customFiles.js.forEach(customFilesEach('js'));
 			scripts.forEach((script) => {
 				if(!isEnable(script))
 					return;
 				script.dependent.forEach((depScript) => {
 					if(!isEnable(script))
 						return;
+					console.log(depScript.customDependent);
 					let depString = (() => depScript.customDependent && depScript.customDependent.length && "'" + depScript.customDependent.join("','") + "'" || '')();
 					text += "\twp_register_script('" + depScript.name + "', $wwe_template_directory_uri . '/" + depScript.file + "', array(" + depString + "), null, " + depScript.footer + " );\n";
 				});
@@ -169,9 +222,17 @@ console.log(chunkOptions.theme);
 					let arr = [];
 					script.dependent.forEach((v) => script.name != v.name && arr.push(v.name));
 					arr = arr.concat(script.customDependent);
-					return "'" + arr.join("','") + "'";
+					if(arr.length)
+						return "'" + arr.join("','") + "'";
+					return '';
 				})();
-				text += "\twp_register_script('" + script.name + "', $wwe_template_directory_uri . '/" + script.file + "', array(" + depString + "), null, " + script.footer + " );\n";
+				let file;
+				if(/^(https?:)?\/\//.test(script.file)){
+					file = "'" + script.file + "'";
+				}else{
+					file = "$wwe_template_directory_uri . '/" + script.file + "'";
+				}
+				text += "\twp_register_script('" + script.name + "', "+file+", array(" + depString + "), null, " + script.footer + " );\n";
 			});
 			scripts.forEach((script) => {
 				if(!isEnable(script))
@@ -180,6 +241,8 @@ console.log(chunkOptions.theme);
 			});
 			/*> scripts */
 			/* styles */
+			self.options.customFiles && self.options.customFiles.css && self.options.customFiles.css.length && self.options.customFiles.css.forEach(customFilesEach('css'));
+			styles.reverse();
 			styles.forEach((style) => {
 				if(!isEnable(style))
 					return;
@@ -196,7 +259,13 @@ console.log(chunkOptions.theme);
 					style.customDependent = style.customDependent.filter((v) => v);
 				}
 				let depString = (() => style.customDependent && style.customDependent.length && "'" + style.customDependent.join("','") + "'" || '')();
-				text += "\twp_register_style('" + style.name + "', $wwe_template_directory_uri . '/" + style.file + "', array(" + depString + "), null );\n";
+				let file;
+				if(/^(https?:)?\/\//.test(style.file)){
+					file = "'" + style.file + "'";
+				}else{
+					file = "$wwe_template_directory_uri . '/" + style.file + "'";
+				}
+				text += "\twp_register_style('" + style.name + "', "+file+", array(" + depString + "), null );\n";
 			});
 			styles.forEach((style) => {
 				if(!isEnable(style))
@@ -292,3 +361,7 @@ console.log(chunkOptions.theme);
 };
 
 module.exports = webpackWpEntrypoints;
+
+function isBool(v){
+	return v === false || v === true;
+}
