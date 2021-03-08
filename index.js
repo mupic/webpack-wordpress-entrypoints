@@ -1,8 +1,9 @@
+const webpackPkg = require('webpack/package.json');
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-// const util = require('util');
-// console.log(util.inspect(compilation, {depth: 4}));
+let isWebpack4 = parseFloat(webpackPkg.version) < 5;
 
 let jsonHash = '';
 
@@ -12,7 +13,8 @@ function webpackWpEntrypoints(options){
 		type: 'wp', //json
 		filename: 'wwe_entrypoints.php',
 		path: './',
-		chunkOptions: {},
+		entryOptions: {},
+		chunkOptions: undefined, //deprecated
 		dependence: [],
 		dependenceCss: [],
 		async: false,
@@ -26,6 +28,17 @@ function webpackWpEntrypoints(options){
 		themeCss: null,
 		excludeScripts: false,
 		excludeStyles: false,
+		criticalStyles: [
+			{
+				test: false, //regexp or function, false - skip. The function receives 3 arguments: fileName, content, info - object with information about the file (only since webpack version >= 5).
+				theme: true, //Does not inherit the values of the main options.
+				admin: false, //Does not inherit the values of the main options.
+				gutenberg: false, //Does not inherit the values of the main options.
+				footer: false, //Does not inherit the values of the main options. Works with theme only.
+				conditions: `true`, //wordpress functions are inserted into the "if ({{conditions}})" check condition
+				variableTemplate: `{{styles}}`, //Template for generating output of styles: {{styles}} - inserts a variable with styles.
+			},
+		],
 		customFiles: {
 			js: [{
 				src: false, //If set to false, it will not be generated.
@@ -41,6 +54,11 @@ function webpackWpEntrypoints(options){
 		},
 		...options,
 	};
+
+	if(options.chunkOptions){
+		options.entryOptions = options.chunkOptions;
+		console.warn('Warning: options.chunkOptions is deprecated; use options.entryOptions instead. options.chunkOptions are deprecated and will be removed in a future version.');
+	}
 
 	if(options.async == true && options.defer == true)
 		options.defer = false;
@@ -62,7 +80,60 @@ function webpackWpEntrypoints(options){
 
 webpackWpEntrypoints.prototype.apply = function(compiler){
 	let self = this;
-	compiler.hooks.done.tapAsync('webpackWpEntrypoints', (compilation, callback) => {
+
+	let criticalStyles = {};
+	compiler.hooks.assetEmitted.tapAsync('webpackWpEntrypoints', (file, info, callback) => {
+		if(typeof self.options.criticalStyles === 'undefined' || !self.options.criticalStyles || !self.options.criticalStyles.length)
+			return callback();
+
+		let source = '';
+		if(isWebpack4){
+			source = new Buffer.from(info).toString();
+		}else{
+			source = info.source._cachedSource;
+		}
+
+		self.options.criticalStyles.forEach((obj, index) => {
+			let settings = {
+				test: false,
+				theme: false,
+				admin: false,
+				gutenberg: false,
+				footer: false,
+				conditions: `true`,
+				variableTemplate: `{{styles}}`,
+				...obj,
+			};
+
+			if(!settings.test)
+				return;
+
+			let testResult = false;
+			if(typeof settings.test == 'function'){
+				testResult = settings.test(file, source, info);
+			}else{
+				testResult = settings.test.test(file);
+			}
+			if(!testResult)
+				return;
+
+			let stylesVar = '$wwe_style_' + index;
+
+			if(typeof criticalStyles[index] == 'undefined')
+				criticalStyles[index] = {};
+			if(!criticalStyles[index].settings)
+				criticalStyles[index].settings = settings;
+			if(!criticalStyles[index].variable)
+				criticalStyles[index].variable = stylesVar;
+			if(!criticalStyles[index].files) ;
+			criticalStyles[index].files = {};
+			criticalStyles[index].files[file] = {source: source, info: isWebpack4? {} : info};
+			criticalStyles[index].sources = (criticalStyles[index].sources || '') + ' ' + source;
+		});
+
+		callback();
+	});
+	compiler.hooks.done.tapAsync('webpackWpEntrypoints', (compilation, callback) => { //https://webpack.js.org/api/compiler-hooks/#done
 		let compilationToJson = compilation.toJson();
 		let pathToSave = this.options.path;
 		let nameToSave = this.options.filename;
@@ -111,16 +182,17 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 		Object.entries(compilationToJson.entrypoints).forEach((values, pointsIndex) => {
 			let key = values[0];
 			let value = JSON.parse(JSON.stringify(values[1]));
+			let valueAssets = !isWebpack4? value.assets.map(({name}) => name) : value.assets;
 			let mainFileIndex = value.assets.length - 1;
-			let chunkOptions = typeof this.options.chunkOptions[key] != 'undefined'? this.options.chunkOptions[key] : {};
-			let customDependence = chunkOptions && typeof chunkOptions.dependence != 'undefined' && (Array.isArray(chunkOptions.dependence)? chunkOptions.dependence : []) || undefined;
-			let customDependenceCss = chunkOptions && typeof chunkOptions.dependenceCss != 'undefined' && (Array.isArray(chunkOptions.dependenceCss)? chunkOptions.dependenceCss : []) || undefined;
-			let excludeScripts = chunkOptions && chunkOptions.excludeScripts || this.options.excludeScripts;
-			let excludeStyles = chunkOptions && chunkOptions.excludeStyles || this.options.excludeStyles;
-			let registerHandleScript = chunkOptions && chunkOptions.registerHandleScript || '';
-			let registerHandleStyle = chunkOptions && chunkOptions.registerHandleStyle || '';
+			let entryOptions = typeof this.options.entryOptions[key] != 'undefined'? this.options.entryOptions[key] : {};
+			let customDependence = entryOptions && typeof entryOptions.dependence != 'undefined' && (Array.isArray(entryOptions.dependence)? entryOptions.dependence : []) || undefined;
+			let customDependenceCss = entryOptions && typeof entryOptions.dependenceCss != 'undefined' && (Array.isArray(entryOptions.dependenceCss)? entryOptions.dependenceCss : []) || undefined;
+			let excludeScripts = entryOptions && entryOptions.excludeScripts || this.options.excludeScripts;
+			let excludeStyles = entryOptions && entryOptions.excludeStyles || this.options.excludeStyles;
+			let registerHandleScript = entryOptions && entryOptions.registerHandleScript || '';
+			let registerHandleStyle = entryOptions && entryOptions.registerHandleStyle || '';
 
-			if(chunkOptions === false || excludeScripts && excludeStyles)
+			if(entryOptions === false || excludeScripts && excludeStyles)
 				return;
 
 			let script = {};
@@ -128,15 +200,16 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			if(!excludeScripts){
 				script = {
 					name: registerHandleScript || key,
-					file: path.join(output, value.assets[mainFileIndex]).replace(/\\/g, '/'),
+					original_file: valueAssets[mainFileIndex],
+					file: path.join(output, valueAssets[mainFileIndex]).replace(/\\/g, '/'),
 					dependent: [], //The scripts on which the main depends
 					customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependence,
-					async: isBool(chunkOptions.async)? chunkOptions.async : this.options.async,
-					defer: isBool(chunkOptions.defer)? chunkOptions.defer : this.options.defer,
-					footer: isBool(chunkOptions.footer)? chunkOptions.footer : this.options.footer,
-					admin: isBool(chunkOptions.admin)? chunkOptions.admin : this.options.admin,
-					gutenberg: isBool(chunkOptions.gutenberg)? chunkOptions.gutenberg : this.options.gutenberg,
-					theme: isBool(chunkOptions.theme)? chunkOptions.theme : this.options.theme,
+					async: isBool(entryOptions.async)? entryOptions.async : this.options.async,
+					defer: isBool(entryOptions.defer)? entryOptions.defer : this.options.defer,
+					footer: isBool(entryOptions.footer)? entryOptions.footer : this.options.footer,
+					admin: isBool(entryOptions.admin)? entryOptions.admin : this.options.admin,
+					gutenberg: isBool(entryOptions.gutenberg)? entryOptions.gutenberg : this.options.gutenberg,
+					theme: isBool(entryOptions.theme)? entryOptions.theme : this.options.theme,
 				};
 				if(script.async == true && script.defer == true)
 					script.defer = false;
@@ -146,41 +219,65 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 			let script_i = 0;
 			let style_i = 0;
-			value.assets.forEach((file, i) => {
+			valueAssets.forEach((file, i) => {
 				if(i == mainFileIndex)
 					return;
 
-				file = path.join(output, file).replace(/\\/g, '/');
+				let src = path.join(output, file).replace(/\\/g, '/');
 
-				if(/\.js$/i.test(file)){
+				if(/\.js$/i.test(src)){
 					if(!excludeScripts){
 						script.dependent.push({
-							file,
-							name: (registerHandleScript? registerHandleScript + '~' + pointsIndex + '~' + script_i++ : false) || path.basename(file, '.js'),
+							file: src,
+							original_file: file,
+							name: (registerHandleScript? registerHandleScript + '~' + pointsIndex + '~' + script_i++ : false) || path.basename(src, '.js'),
 							customDependent: this.options.dependence && this.options.dependence.length && this.options.dependence || [],
 							defer: script.defer,
 							footer: script.footer,
 						});
 					}
-				}else if(/\.css$/i.test(file)){
+				}else if(/\.css$/i.test(src)){
 					if(!excludeStyles){
+						let criticalStyleSkip = false; //skip critical styles
+						self.options.criticalStyles.forEach(({test = false}, index) => {
+							if(!test || !criticalStyles[index])
+								return;
+
+							let fileSource = criticalStyles[index].files[file];
+							if(!fileSource)
+								return;
+
+							if(typeof test == 'function'){
+								criticalStyleSkip = test(file, fileSource.source, fileSource.info);
+							}else{
+								criticalStyleSkip = test.test(file);
+							}
+
+							delete criticalStyles[index].files[file], fileSource;
+						});
+
+						if(criticalStyleSkip)
+							return;
+
 						if(typeof collectedStyles[key] == 'undefined')
 							collectedStyles[key] = [];
 
-						let name = (registerHandleStyle? registerHandleStyle + (collectedStyles[key].length? '~' + style_i++ : '') : false) || path.basename(file, '.css');
+						let name = (registerHandleStyle? registerHandleStyle + (collectedStyles[key].length? '~' + style_i++ : '') : false) || path.basename(src, '.css');
 
 						collectedStyles[key].push({
-							file,
+							file: src,
+							original_file: file,
 							name,
 						});
 
 						styles.push({
-							file,
+							file: src,
+							original_file: file,
 							name,
 							customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependenceCss,
-							admin: chunkOptions.adminCss === false || chunkOptions.adminCss === true? chunkOptions.adminCss : (chunkOptions.admin !== null && chunkOptions.admin !== undefined? chunkOptions.admin : this.options.adminCss),
-							gutenberg: chunkOptions.gutenbergCss === false || chunkOptions.gutenbergCss === true? chunkOptions.gutenbergCss : (chunkOptions.gutenberg !== null && chunkOptions.gutenberg !== undefined? chunkOptions.gutenberg : this.options.gutenbergCss),
-							theme: chunkOptions.themeCss === false || chunkOptions.themeCss === true? chunkOptions.themeCss : (chunkOptions.theme !== null && chunkOptions.theme !== undefined? chunkOptions.theme : this.options.themeCss),
+							admin: entryOptions.adminCss === false || entryOptions.adminCss === true? entryOptions.adminCss : (entryOptions.admin !== null && entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
+							gutenberg: entryOptions.gutenbergCss === false || entryOptions.gutenbergCss === true? entryOptions.gutenbergCss : (entryOptions.gutenberg !== null && entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
+							theme: entryOptions.themeCss === false || entryOptions.themeCss === true? entryOptions.themeCss : (entryOptions.theme !== null && entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
 						});
 					}
 				}
@@ -214,9 +311,8 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				script.dependent.forEach((depScript) => {
 					if(!isEnable(script))
 						return;
-					console.log(depScript.customDependent);
 					let depString = (() => depScript.customDependent && depScript.customDependent.length && "'" + depScript.customDependent.join("','") + "'" || '')();
-					text += "\twp_register_script('" + depScript.name + "', $wwe_template_directory_uri . '/" + depScript.file + "', array(" + depString + "), null, " + depScript.footer + " );\n";
+					text += "\twp_register_script('" + depScript.name + "', $wwe_template_directory_uri . '/" + depScript.file + "', array(" + depString + "), null, " + depScript.footer + ");\n";
 				});
 				let depString = (() => {
 					let arr = [];
@@ -232,7 +328,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}else{
 					file = "$wwe_template_directory_uri . '/" + script.file + "'";
 				}
-				text += "\twp_register_script('" + script.name + "', "+file+", array(" + depString + "), null, " + script.footer + " );\n";
+				text += "\twp_register_script('" + script.name + "', " + file + ", array(" + depString + "), null, " + script.footer + ");\n";
 			});
 			scripts.forEach((script) => {
 				if(!isEnable(script))
@@ -242,10 +338,12 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			/*> scripts */
 			/* styles */
 			self.options.customFiles && self.options.customFiles.css && self.options.customFiles.css.length && self.options.customFiles.css.forEach(customFilesEach('css'));
-			styles.reverse();
+			// if(isWebpack4)
+			// 	styles.reverse();
 			styles.forEach((style) => {
 				if(!isEnable(style))
 					return;
+
 				if(style.customDependent && style.customDependent.length){
 					style.customDependent.forEach((depName, i) => {
 						if(typeof collectedStyles[depName] != 'undefined'){
@@ -265,7 +363,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}else{
 					file = "$wwe_template_directory_uri . '/" + style.file + "'";
 				}
-				text += "\twp_register_style('" + style.name + "', "+file+", array(" + depString + "), null );\n";
+				text += "\twp_register_style('" + style.name + "', " + file + ", array(" + depString + "), null);\n";
 			});
 			styles.forEach((style) => {
 				if(!isEnable(style))
@@ -304,26 +402,26 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				if(!script.async && !script.defer)
 					return;
 				asyncDefrSrc += '\tif($handle == "' + script.name + '"){\n';
-				asyncDefrSrc += '\t\treturn str_replace( " src", " ' + (script.async? 'async' : '') + '' + (script.defer? 'defer' : '') + ' src", $tag );\n';
+				asyncDefrSrc += '\t\treturn str_replace(" src", " ' + (script.async? 'async' : '') + '' + (script.defer? 'defer' : '') + ' src", $tag);\n';
 				asyncDefrSrc += '\t}\n';
 				script.dependent.forEach((depScript) => {
 					if(!depScript.async && !depScript.defer)
 						return;
 					asyncDefrSrc += '\tif($handle == "' + depScript.name + '"){\n';
-					asyncDefrSrc += '\t\treturn str_replace( " src", " ' + (depScript.async? 'async' : '') + '' + (depScript.defer? 'defer' : '') + ' src", $tag );\n';
+					asyncDefrSrc += '\t\treturn str_replace(" src", " ' + (depScript.async? 'async' : '') + '' + (depScript.defer? 'defer' : '') + ' src", $tag);\n';
 					asyncDefrSrc += '\t}\n';
 				});
 			});
 			if(asyncDefrSrc){
-				blob += 'add_filter( "script_loader_tag", function( $tag, $handle ){\n';
+				blob += 'add_filter("script_loader_tag", function($tag, $handle){\n';
 				blob += asyncDefrSrc;
 				blob += '\treturn $tag;\n';
-				blob += '}, 10, 2 );\n';
+				blob += '}, 10, 2);\n';
 			}
 
 			let blobTheme = enqueue_scripts('theme');
 			if(blobTheme){
-				blob += "add_action( 'wp_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
+				blob += "add_action('wp_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
 				blob += "\tdo_action('wwe_wp_enqueue_scripts_before');\n";
 				blob += blobTheme;
 				blob += "\tdo_action('wwe_wp_enqueue_scripts_after');\n";
@@ -332,7 +430,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 			let blobAdmin = enqueue_scripts('admin');
 			if(blobAdmin){
-				blob += "add_action( 'admin_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
+				blob += "add_action('admin_enqueue_scripts', function() use($wwe_template_directory_uri){\n";
 				blob += "\tdo_action('wwe_admin_enqueue_scripts_before');\n";
 				blob += blobAdmin;
 				blob += "\tdo_action('wwe_admin_enqueue_scripts_after');\n";
@@ -341,11 +439,50 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 			let blobGutenberg = enqueue_scripts('gutenberg');
 			if(blobGutenberg){
-				blob += "add_action( 'enqueue_block_editor_assets', function() use($wwe_template_directory_uri){\n";
+				blob += "add_action('enqueue_block_editor_assets', function() use($wwe_template_directory_uri){\n";
 				blob += "\tdo_action('wwe_enqueue_block_editor_assets_before');\n";
 				blob += blobGutenberg;
 				blob += "\tdo_action('wwe_enqueue_block_editor_assets_after');\n";
 				blob += "});\n";
+			}
+
+			if(Object.keys(criticalStyles).length){
+				Object.keys(criticalStyles).forEach((key) => {
+					let options = criticalStyles[key];
+					if(!options.sources)
+						return;
+
+					$stylesPhp = '';
+					$stylesPhp += "\tif(" + options.settings.conditions + "){\n";
+					$stylesPhp += "\t\twp_register_style('wwe_critical_styles-" + key + "', false, false, false, true);\n";
+					$stylesPhp += "\t\twp_add_inline_style('wwe_critical_styles-" + key + "', " + applyTemplate(options.settings.variableTemplate, {styles: options.variable}) + ");\n";
+					$stylesPhp += "\t\twp_enqueue_style('wwe_critical_styles-" + key + "');\n";
+					$stylesPhp += "\t}";
+
+					blob += "" +
+						options.variable + " = <<<TEXT\n" +
+						options.sources + "\n" +
+						"TEXT;\n";
+					if(options.settings.theme){
+						if(options.settings.footer){
+							blob += "add_action('wp_footer', function() use(" + options.variable + ") {\n";
+						}else{
+							blob += "add_action('wp_enqueue_scripts', function() use(" + options.variable + ") {\n";
+						}
+						blob += $stylesPhp;
+						blob += "\n}, 1);\n";
+					}
+					if(options.settings.admin){
+						blob += "add_action('admin_enqueue_scripts', function() use(" + options.variable + ") {\n";
+						blob += $stylesPhp;
+						blob += "\n}, 1);\n";
+					}
+					if(options.settings.gutenberg){
+						blob += "add_action('enqueue_block_editor_assets', function() use(" + options.variable + ") {\n";
+						blob += $stylesPhp;
+						blob += "\n}, 1);\n";
+					}
+				});
 			}
 		}
 
@@ -364,4 +501,20 @@ module.exports = webpackWpEntrypoints;
 
 function isBool(v){
 	return v === false || v === true;
+}
+
+function applyTemplate(template, properties){
+	var returnValue = "";
+
+	var templateFragments = template.split("{{");
+
+	returnValue += templateFragments[0];
+
+	for(var i = 1; i < templateFragments.length; i++){
+		var fragmentSections = templateFragments[i].split("}}", 2);
+		returnValue += properties[fragmentSections[0]];
+		returnValue += fragmentSections[1];
+	}
+
+	return returnValue;
 }
