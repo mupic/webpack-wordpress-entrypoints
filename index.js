@@ -30,7 +30,7 @@ function webpackWpEntrypoints(options){
 		excludeStyles: false,
 		criticalStyles: [
 			{
-				test: false, //regexp or function, false - skip. The function receives 3 arguments: fileName, content, info - object with information about the file (only since webpack version >= 5).
+				test: false, //regexp or function, false - skip. The function receives 3 arguments: fileName, content.
 				theme: true, //Does not inherit the values of the main options.
 				admin: false, //Does not inherit the values of the main options.
 				gutenberg: false, //Does not inherit the values of the main options.
@@ -82,54 +82,49 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 	let self = this;
 
 	let criticalStyles = {};
-	compiler.hooks.assetEmitted.tapAsync('webpackWpEntrypoints', (file, info, callback) => {
+	compiler.hooks.emit.tapAsync('webpackWpEntrypoints', (compilation, callback) => {
 		if(typeof self.options.criticalStyles === 'undefined' || !self.options.criticalStyles || !self.options.criticalStyles.length)
 			return callback();
+		for(let file in compilation.assets){
+			let fileObj = compilation.assets[file];
+			let source = fileObj.source();
+			self.options.criticalStyles.forEach((obj, index) => {
+				let settings = {
+					test: false,
+					theme: false,
+					admin: false,
+					gutenberg: false,
+					footer: false,
+					conditions: `true`,
+					variableTemplate: `{{styles}}`,
+					...obj,
+				};
 
-		let source = '';
-		if(isWebpack4){
-			source = new Buffer.from(info).toString();
-		}else{
-			source = info.source._cachedSource;
+				if(!settings.test)
+					return;
+
+				let testResult = false;
+				if(typeof settings.test == 'function'){
+					testResult = settings.test(file, source);
+				}else{
+					testResult = settings.test.test(file);
+				}
+				if(!testResult)
+					return;
+
+				let stylesVar = '$wwe_style_' + index;
+
+				if(typeof criticalStyles[index] == 'undefined')
+					criticalStyles[index] = {};
+				if(!criticalStyles[index].settings)
+					criticalStyles[index].settings = settings;
+				if(!criticalStyles[index].variable)
+					criticalStyles[index].variable = stylesVar;
+				if(!criticalStyles[index].files)
+					criticalStyles[index].files = {};
+				criticalStyles[index].files[file] = {source: source};
+			});
 		}
-
-		self.options.criticalStyles.forEach((obj, index) => {
-			let settings = {
-				test: false,
-				theme: false,
-				admin: false,
-				gutenberg: false,
-				footer: false,
-				conditions: `true`,
-				variableTemplate: `{{styles}}`,
-				...obj,
-			};
-
-			if(!settings.test)
-				return;
-
-			let testResult = false;
-			if(typeof settings.test == 'function'){
-				testResult = settings.test(file, source, info);
-			}else{
-				testResult = settings.test.test(file);
-			}
-			if(!testResult)
-				return;
-
-			let stylesVar = '$wwe_style_' + index;
-
-			if(typeof criticalStyles[index] == 'undefined')
-				criticalStyles[index] = {};
-			if(!criticalStyles[index].settings)
-				criticalStyles[index].settings = settings;
-			if(!criticalStyles[index].variable)
-				criticalStyles[index].variable = stylesVar;
-			if(!criticalStyles[index].files) ;
-			criticalStyles[index].files = {};
-			criticalStyles[index].files[file] = {source: source, info: isWebpack4? {} : info};
-			criticalStyles[index].sources = (criticalStyles[index].sources || '') + ' ' + source;
-		});
 
 		callback();
 	});
@@ -238,26 +233,10 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					}
 				}else if(/\.css$/i.test(src)){
 					if(!excludeStyles){
-						let criticalStyleSkip = false; //skip critical styles
-						self.options.criticalStyles.forEach(({test = false}, index) => {
-							if(!test || !criticalStyles[index])
+						for(let index in self.options.criticalStyles){ //skip critical styles
+							if(criticalStyles[index] && criticalStyles[index].files[file])
 								return;
-
-							let fileSource = criticalStyles[index].files[file];
-							if(!fileSource)
-								return;
-
-							if(typeof test == 'function'){
-								criticalStyleSkip = test(file, fileSource.source, fileSource.info);
-							}else{
-								criticalStyleSkip = test.test(file);
-							}
-
-							delete criticalStyles[index].files[file], fileSource;
-						});
-
-						if(criticalStyleSkip)
-							return;
+						}
 
 						if(typeof collectedStyles[key] == 'undefined')
 							collectedStyles[key] = [];
@@ -449,7 +428,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			if(Object.keys(criticalStyles).length){
 				Object.keys(criticalStyles).forEach((key) => {
 					let options = criticalStyles[key];
-					if(!options.sources)
+					let source = '';
+					for(let file in criticalStyles[key].files){
+						source += criticalStyles[key].files[file].source + ' ';
+					}
+					if(!source)
 						return;
 
 					$stylesPhp = '';
@@ -461,7 +444,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 					blob += "" +
 						options.variable + " = <<<TEXT\n" +
-						options.sources + "\n" +
+						source + "\n" +
 						"TEXT;\n";
 					if(options.settings.theme){
 						if(options.settings.footer){
@@ -484,6 +467,8 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					}
 				});
 			}
+
+			criticalStyles = {};
 		}
 
 		fs.writeFile(destination, blob, {encoding: 'utf8', flag: 'w'}, function(err){
