@@ -298,12 +298,21 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			self.options.customFiles && self.options.customFiles.js && self.options.customFiles.js.length && self.options.customFiles.js.forEach(customFilesEach('js', (script) => {
 				_scripts.push(script);
 			}));
+			_scripts = [..._scripts, ...scripts];
 			_scripts.forEach((script) => {
 				if(!isEnable(script))
 					return;
+
+				if(Array.isArray(script.customDependent) && script.customDependent.length)
+					script.customDependent = script.customDependent.filter(v => v != script.name); //You cannot wait for yourself in dependent scripts.
+
 				script.dependent.forEach((depScript) => {
 					if(!isEnable(script))
 						return;
+
+					if(Array.isArray(depScript.customDependent) && depScript.customDependent.length)
+						depScript.customDependent = depScript.customDependent.filter(v => v != depScript.name); //You cannot wait for yourself in dependent scripts.
+
 					let depString = (() => depScript.customDependent && depScript.customDependent.length && "'" + depScript.customDependent.join("','") + "'" || '')();
 					text += "\twp_register_script('" + depScript.name + "', $wwe_template_directory_uri . '/" + depScript.file + "', array(" + depString + "), null, " + depScript.footer + ");\n";
 				});
@@ -330,15 +339,19 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			});
 			/*> scripts */
 			/* styles */
-			let _styles = [...styles];
+			let _styles = [];
 			self.options.customFiles && self.options.customFiles.css && self.options.customFiles.css.length && self.options.customFiles.css.forEach(customFilesEach('css', (style) => {
 				_styles.push(style);
 			}));
+			_styles = [..._styles, ...styles];
 			// if(isWebpack4)
 			// 	styles.reverse();
 			_styles.forEach((style) => {
 				if(!isEnable(style))
 					return;
+
+				if(Array.isArray(style.customDependent) && style.customDependent.length)
+					style.customDependent = style.customDependent.filter(v => v != style.name); //You cannot wait for yourself in dependent styles.
 
 				if(style.customDependent && style.customDependent.length){
 					style.customDependent.forEach((depName, i) => {
