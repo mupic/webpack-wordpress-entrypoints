@@ -294,7 +294,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}
 			};
 			/* scripts */
-			let _scripts = [...scripts];
+			let _scripts = [];
 			self.options.customFiles && self.options.customFiles.js && self.options.customFiles.js.length && self.options.customFiles.js.forEach(customFilesEach('js', (script) => {
 				_scripts.push(script);
 			}));
