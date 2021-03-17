@@ -138,38 +138,49 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 		let scripts = [];
 		let styles = [];
 
-		let customFilesEach = (type) => (obj) => {
-			if(!obj.src)
-				return;
+		let customFilesEach = (type, callback = (scriptObj) => {}) => {
+			let newArray = [];
+			return (obj) => {
+				obj = {
+					src: false,
+					handle: false,
+					dependence: undefined,
+					gutenberg: null,
+					admin: null,
+					theme: null,
+					async: null,
+					footer: null,
+					...obj,
+				};
 
-			let name = obj.handle;
-			if(!name){
-				let md5sum = crypto.createHash('md5');
-				md5sum.update(obj.src);
-				name = md5sum.digest('hex');
-			}
+				if(!obj.src)
+					return;
 
-			let dependence = typeof obj.dependence != 'undefined' && (Array.isArray(obj.dependence)? obj.dependence : []) || undefined;
+				let name = obj.handle;
+				if(!name){
+					let md5sum = crypto.createHash('md5');
+					md5sum.update(obj.src);
+					name = md5sum.digest('hex');
+				}
 
-			let script = {
-				name: name,
-				file: obj.src,
-				dependent: [], //The scripts on which the main depends
-				customDependent: typeof dependence != 'undefined'? dependence : (type == 'js'? this.options.dependence : this.options.dependenceCss),
-				async: isBool(obj.async)? obj.async : this.options.async,
-				defer: isBool(obj.defer)? obj.defer : this.options.defer,
-				footer: isBool(obj.footer)? obj.footer : this.options.footer,
-				admin: isBool(obj.admin)? obj.admin : this.options.admin,
-				gutenberg: isBool(obj.gutenberg)? obj.gutenberg : this.options.gutenberg,
-				theme: isBool(obj.theme)? obj.theme : this.options.theme,
-			};
-			if(script.async == true && script.defer == true)
-				script.defer = false;
+				let dependence = typeof obj.dependence != 'undefined' && (Array.isArray(obj.dependence)? obj.dependence : []) || undefined;
 
-			if(type == 'js'){
-				scripts.push(script);
-			}else{
-				styles.push(script);
+				let script = {
+					name: name,
+					file: obj.src,
+					dependent: [], //The scripts on which the main depends
+					customDependent: typeof dependence != 'undefined'? dependence : (type == 'js'? this.options.dependence : this.options.dependenceCss),
+					async: isBool(obj.async)? obj.async : this.options.async,
+					defer: isBool(obj.defer)? obj.defer : this.options.defer,
+					footer: isBool(obj.footer)? obj.footer : this.options.footer,
+					admin: isBool(obj.admin)? obj.admin : this.options.admin,
+					gutenberg: isBool(obj.gutenberg)? obj.gutenberg : this.options.gutenberg,
+					theme: isBool(obj.theme)? obj.theme : this.options.theme,
+				};
+				if(script.async == true && script.defer == true)
+					script.defer = false;
+
+				callback(script);
 			}
 		};
 
@@ -283,8 +294,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}
 			};
 			/* scripts */
-			self.options.customFiles && self.options.customFiles.js && self.options.customFiles.js.length && self.options.customFiles.js.forEach(customFilesEach('js'));
-			scripts.forEach((script) => {
+			let _scripts = [...scripts];
+			self.options.customFiles && self.options.customFiles.js && self.options.customFiles.js.length && self.options.customFiles.js.forEach(customFilesEach('js', (script) => {
+				_scripts.push(script);
+			}));
+			_scripts.forEach((script) => {
 				if(!isEnable(script))
 					return;
 				script.dependent.forEach((depScript) => {
@@ -309,17 +323,20 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}
 				text += "\twp_register_script('" + script.name + "', " + file + ", array(" + depString + "), null, " + script.footer + ");\n";
 			});
-			scripts.forEach((script) => {
+			_scripts.forEach((script) => {
 				if(!isEnable(script))
 					return;
 				text += "\twp_enqueue_script('" + script.name + "');\n";
 			});
 			/*> scripts */
 			/* styles */
-			self.options.customFiles && self.options.customFiles.css && self.options.customFiles.css.length && self.options.customFiles.css.forEach(customFilesEach('css'));
+			let _styles = [...styles];
+			self.options.customFiles && self.options.customFiles.css && self.options.customFiles.css.length && self.options.customFiles.css.forEach(customFilesEach('css', (style) => {
+				_styles.push(style);
+			}));
 			// if(isWebpack4)
 			// 	styles.reverse();
-			styles.forEach((style) => {
+			_styles.forEach((style) => {
 				if(!isEnable(style))
 					return;
 
@@ -344,7 +361,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				}
 				text += "\twp_register_style('" + style.name + "', " + file + ", array(" + depString + "), null);\n";
 			});
-			styles.forEach((style) => {
+			_styles.forEach((style) => {
 				if(!isEnable(style))
 					return;
 				text += "\twp_enqueue_style('" + style.name + "');\n";
