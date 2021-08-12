@@ -264,7 +264,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 							file: src,
 							original_file: file,
 							name,
-							customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependenceCss,
+							customDependent: typeof customDependenceCss != 'undefined'? customDependenceCss : this.options.dependenceCss,
 							admin: entryOptions.adminCss === false || entryOptions.adminCss === true? entryOptions.adminCss : (entryOptions.admin !== null && entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
 							gutenberg: entryOptions.gutenbergCss === false || entryOptions.gutenbergCss === true? entryOptions.gutenbergCss : (entryOptions.gutenberg !== null && entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
 							theme: entryOptions.themeCss === false || entryOptions.themeCss === true? entryOptions.themeCss : (entryOptions.theme !== null && entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
