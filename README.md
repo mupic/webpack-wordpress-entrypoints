@@ -39,13 +39,13 @@ module.exports = (env, argv) => {
                         dependenceCss: [], //Sets the dependency of this style on another
                         async: true, //Set the async attribute for this file only.
                         defer: false, //defer and async cannot be installed together, only async will be used
-                        footer: true, //Put the script at the bottom of the wordpress site
-                        admin: true, //Include the script to the wordpress admin panel
-                        adminCss: null, //Include the style to the wordpress admin panel. Default: same as admin
-                        gutenberg: false, //Include the script to the gutenberg editor
-                        gutenbergCss: name, //Include the style to the gutenberg editor. Default: same as gutenberg
-                        theme: true, //Include the script to the site theme
-                        themeCss: null, //Include the style to the site theme. Default: same as theme
+                        footer: true, //Put the script at the bottom of the wordpress site. If set to null, it will only register the script, but not enable it.
+                        admin: true, //Include the script to the wordpress admin panel. If set to null, it will only register the script, but not enable it.
+                        adminCss: undefined, //Include the style to the wordpress admin panel. If set to null, it will only register the script, but not enable it. Default: same as admin
+                        gutenberg: false, //Include the script to the gutenberg editor. If set to null, it will only register the script, but not enable it.
+                        gutenbergCss: name, //Include the style to the gutenberg editor. If set to null, it will only register the script, but not enable it. Default: same as gutenberg
+                        theme: true, //Include the script to the site theme. If set to null, it will only register the script, but not enable it.
+                        themeCss: undefined, //Include the style to the site theme. If set to null, it will only register the script, but not enable it. Default: same as theme
                         excludeScripts: false, //true - Excludes script output. Inherits the value of the main option.
                         excludeStyles: false, //true - Excludes style output. Inherits the value of the main option.
                     },
@@ -67,11 +67,11 @@ module.exports = (env, argv) => {
                             src: devMode? `http://localhost:${WPConfig.proxy.port}/browser-sync/browser-sync-client.js` : false, //In this example, we have a condition that is triggered only during development modes. If you specify false, then the script will not be included.
                             handle: false, //If not set, a hash from src will be generated.
                             dependence: undefined, //Inherits the value of the main option. 
-                            gutenberg: null, //Inherits the value of the main option.
-                            admin: null, //Inherits the value of the main option.
-                            theme: null, //Inherits the value of the main option.
-                            async: null, //Inherits the value of the main option.
-                            footer: null, //Inherits the value of the main option.
+                            gutenberg: undefined, //Inherits the value of the main option.
+                            admin: undefined, //Inherits the value of the main option.
+                            theme: undefined, //Inherits the value of the main option.
+                            async: undefined, //Inherits the value of the main option.
+                            footer: undefined, //Inherits the value of the main option.
                         },
                     ],
                     css: []
@@ -82,11 +82,11 @@ module.exports = (env, argv) => {
                 defer: true, //defer and async cannot be installed together, only async will be used. Default: true.
                 footer: true, //Put scripts at the bottom of the wordpress site. Default: true.
                 admin: false, //Include scripts to the wordpress admin panel. Default: false.
-                adminCss: null, //Include styles to the wordpress admin panel. Default: same as admin
+                adminCss: undefined, //Include styles to the wordpress admin panel. Default: same as admin
                 gutenberg: false, //Include the script to the gutenberg editor
                 gutenbergCss: name, //Include the style to the gutenberg editor. Default: same as gutenberg
                 theme: true, //Include scripts to the site theme. Default: true.
-                themeCss: null, //Include styles to the site theme. Default: same as theme
+                themeCss: undefined, //Include styles to the site theme. Default: same as theme
                 excludeScripts: false, //true - Exclude scripts from code generation.
                 excludeStyles: false, //true - Exclude styles from code generation.
             }),
@@ -132,12 +132,12 @@ add_filter( "script_loader_tag", function( $tag, $handle ){
 }, 10, 2 );
 add_action( 'wp_enqueue_scripts', function() use($wwe_template_directory_uri){
     do_action('wwe_wp_enqueue_scripts_before');
-    wp_register_script('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/js/gutenberg.js.bundle.js', array('jquery'), null, true );
-    wp_register_script('build', $wwe_template_directory_uri . '/_dist/js/build.ddca7998b98c837c58eb.js', array('gutenberg.js.bundle','jquery'), null, true );
+    wp_register_script('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/js/gutenberg.js.bundle.js', array('jquery'), undefined, true );
+    wp_register_script('build', $wwe_template_directory_uri . '/_dist/js/build.ddca7998b98c837c58eb.js', array('gutenberg.js.bundle','jquery'), undefined, true );
     wp_enqueue_script('build');
-    wp_register_style('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/css/gutenberg.js.bundle.css', array(), null );
-    wp_register_style('build.ddca7998b98c837c58eb', $wwe_template_directory_uri . '/_dist/css/build.ddca7998b98c837c58eb.css', array(), null );
-    wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), null );
+    wp_register_style('gutenberg.js.bundle', $wwe_template_directory_uri . '/_dist/css/gutenberg.js.bundle.css', array(), undefined );
+    wp_register_style('build.ddca7998b98c837c58eb', $wwe_template_directory_uri . '/_dist/css/build.ddca7998b98c837c58eb.css', array(), undefined );
+    wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), undefined );
     wp_enqueue_style('gutenberg.js.bundle');
     wp_enqueue_style('build.ddca7998b98c837c58eb');
     wp_enqueue_style('gutenberg');
@@ -145,9 +145,9 @@ add_action( 'wp_enqueue_scripts', function() use($wwe_template_directory_uri){
 });
 add_action( 'enqueue_block_editor_assets', function() use($wwe_template_directory_uri){
     do_action('wwe_enqueue_block_editor_assets_before');
-    wp_register_script('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/js/gutenberg.ddca7998b98c837c58eb.js', array('jquery'), null, true );
+    wp_register_script('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/js/gutenberg.ddca7998b98c837c58eb.js', array('jquery'), undefined, true );
     wp_enqueue_script('gutenberg');
-    wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), null );
+    wp_register_style('gutenberg', $wwe_template_directory_uri . '/theme_plugins/gutenberg/dist/css/gutenberg.css', array(), undefined );
     wp_enqueue_style('gutenberg');
     do_action('wwe_enqueue_block_editor_assets_after');
 });

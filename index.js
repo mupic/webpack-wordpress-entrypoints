@@ -21,11 +21,11 @@ function webpackWpEntrypoints(options){
 		defer: true,
 		footer: true,
 		admin: false,
-		adminCss: null,
+		adminCss: undefined,
 		gutenberg: false,
-		gutenbergCss: null,
+		gutenbergCss: undefined,
 		theme: true,
-		themeCss: null,
+		themeCss: undefined,
 		excludeScripts: false,
 		excludeStyles: false,
 		criticalStyles: [
@@ -44,11 +44,11 @@ function webpackWpEntrypoints(options){
 				src: false, //If set to false, it will not be generated.
 				handle: false, //If not set, a hash from src will be generated.
 				dependence: undefined, //Inherits the value of the main option.
-				gutenberg: null, //Inherits the value of the main option.
-				admin: null, //Inherits the value of the main option.
-				theme: null, //Inherits the value of the main option.
-				async: null, //Inherits the value of the main option.
-				footer: null, //Inherits the value of the main option.
+				gutenberg: undefined, //Inherits the value of the main option.
+				admin: undefined, //Inherits the value of the main option.
+				theme: undefined, //Inherits the value of the main option.
+				async: undefined, //Inherits the value of the main option.
+				footer: undefined, //Inherits the value of the main option.
 			}],
 			css: [],
 		},
@@ -60,13 +60,13 @@ function webpackWpEntrypoints(options){
 		console.warn('Warning: options.chunkOptions is deprecated; use options.entryOptions instead. options.chunkOptions are deprecated and will be removed in a future version.');
 	}
 
-	if(options.async == true && options.defer == true)
+	if(options.async === true && options.defer === true)
 		options.defer = false;
-	if(options.themeCss === null)
+	if(options.themeCss === undefined)
 		options.themeCss = options.theme;
-	if(options.adminCss === null)
+	if(options.adminCss === undefined)
 		options.adminCss = options.admin;
-	if(options.gutenbergCss === null)
+	if(options.gutenbergCss === undefined)
 		options.gutenbergCss = options.gutenberg;
 
 	if(!options.filename){
@@ -145,11 +145,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					src: false,
 					handle: false,
 					dependence: undefined,
-					gutenberg: null,
-					admin: null,
-					theme: null,
-					async: null,
-					footer: null,
+					gutenberg: undefined,
+					admin: undefined,
+					theme: undefined,
+					async: undefined,
+					footer: undefined,
 					...obj,
 				};
 
@@ -173,11 +173,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					async: isBool(obj.async)? obj.async : this.options.async,
 					defer: isBool(obj.defer)? obj.defer : this.options.defer,
 					footer: isBool(obj.footer)? obj.footer : this.options.footer,
-					admin: isBool(obj.admin)? obj.admin : this.options.admin,
-					gutenberg: isBool(obj.gutenberg)? obj.gutenberg : this.options.gutenberg,
-					theme: isBool(obj.theme)? obj.theme : this.options.theme,
+					admin: isBool(obj.admin) || obj.admin === null? obj.admin : this.options.admin,
+					gutenberg: isBool(obj.gutenberg) || obj.gutenberg === null? obj.gutenberg : this.options.gutenberg,
+					theme: isBool(obj.theme) || obj.theme === null? obj.theme : this.options.theme,
 				};
-				if(script.async == true && script.defer == true)
+				if(script.async === true && script.defer === true)
 					script.defer = false;
 
 				callback(script);
@@ -213,11 +213,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					async: isBool(entryOptions.async)? entryOptions.async : this.options.async,
 					defer: isBool(entryOptions.defer)? entryOptions.defer : this.options.defer,
 					footer: isBool(entryOptions.footer)? entryOptions.footer : this.options.footer,
-					admin: isBool(entryOptions.admin)? entryOptions.admin : this.options.admin,
-					gutenberg: isBool(entryOptions.gutenberg)? entryOptions.gutenberg : this.options.gutenberg,
-					theme: isBool(entryOptions.theme)? entryOptions.theme : this.options.theme,
+					admin: isBool(entryOptions.admin) || entryOptions.admin === null? entryOptions.admin : this.options.admin,
+					gutenberg: isBool(entryOptions.gutenberg) || entryOptions.gutenberg === null? entryOptions.gutenberg : this.options.gutenberg,
+					theme: isBool(entryOptions.theme) || entryOptions.theme === null? entryOptions.theme : this.options.theme,
 				};
-				if(script.async == true && script.defer == true)
+				if(script.async === true && script.defer === true)
 					script.defer = false;
 
 				scripts.push(script);
@@ -265,21 +265,15 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 							original_file: file,
 							name,
 							customDependent: typeof customDependenceCss != 'undefined'? customDependenceCss : this.options.dependenceCss,
-							admin: entryOptions.adminCss === false || entryOptions.adminCss === true? entryOptions.adminCss : (entryOptions.admin !== null && entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
-							gutenberg: entryOptions.gutenbergCss === false || entryOptions.gutenbergCss === true? entryOptions.gutenbergCss : (entryOptions.gutenberg !== null && entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
-							theme: entryOptions.themeCss === false || entryOptions.themeCss === true? entryOptions.themeCss : (entryOptions.theme !== null && entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
+							admin: isBool(entryOptions.adminCss) || entryOptions.adminCss === null? entryOptions.adminCss : (entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
+							gutenberg: isBool(entryOptions.gutenbergCss) || entryOptions.gutenbergCss === null? entryOptions.gutenbergCss : (entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
+							theme: isBool(entryOptions.themeCss) || entryOptions.themeCss === null? entryOptions.themeCss : (entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
 						});
 					}
 				}
 
 			});
 		});
-
-		function generateRegister(type = 'theme'){
-			let text = '';
-
-			return text;
-		}
 
 		function enqueue_scripts(type = 'theme'){ //theme, admin, gutenberg
 			let text = '';
@@ -300,14 +294,14 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			}));
 			_scripts = [..._scripts, ...scripts];
 			_scripts.forEach((script) => {
-				if(!isEnable(script))
+				if(!isEnable(script) && isEnable(script) !== null)
 					return;
 
 				if(Array.isArray(script.customDependent) && script.customDependent.length)
 					script.customDependent = script.customDependent.filter(v => v != script.name); //You cannot wait for yourself in dependent scripts.
 
 				script.dependent.forEach((depScript) => {
-					if(!isEnable(script))
+					if(!isEnable(script) && isEnable(script) !== null)
 						return;
 
 					if(Array.isArray(depScript.customDependent) && depScript.customDependent.length)
@@ -347,7 +341,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			// if(isWebpack4)
 			// 	styles.reverse();
 			_styles.forEach((style) => {
-				if(!isEnable(style))
+				if(!isEnable(style) && isEnable(style) !== null)
 					return;
 
 				if(Array.isArray(style.customDependent) && style.customDependent.length)
