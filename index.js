@@ -194,7 +194,7 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			let valueAssets = !isWebpack4? value.assets.map(({name}) => name) : value.assets;
 			let mainFileIndex = value.assets.length - 1;
 			let mainStyleFileIndex = valueAssets.reduce((result, src, fileIndex) => {
-				return /\.css$/i.test(src) && fileIndex || result;
+				return /\.css$/i.test(src)? fileIndex : result;
 			}, false);
 			let entryOptions = typeof this.options.entryOptions[key] != 'undefined'? this.options.entryOptions[key] : {};
 			let customDependence = entryOptions && typeof entryOptions.dependence != 'undefined' && (Array.isArray(entryOptions.dependence)? entryOptions.dependence : []) || undefined;
