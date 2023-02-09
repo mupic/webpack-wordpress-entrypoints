@@ -31,10 +31,14 @@ module.exports = (env, argv) => {
                 type: 'wp', //Default: wp. If you specify "json" here, the output will be in json format
                 path: './', //Main directory where are the theme of the site. Default: './';
                 filename: 'wwe_entrypoints.php', //You can specify the path to save the file. The file will be saved in the directory: path + filename. Default: wwe_entrypoints.php
+                dependentHandleNameTemplate: '{{name}}~{{i}}~{{file}}', //Applies only to dependent scripts. {{name}} - handle name. {{file}} - file name. {{i}} - the number of scenarios of current entry points
+                dependentHandleStyleNameTemplate: '', //Applies only to dependent scripts and styles. Inherited from dependentHandleNameTemplate, if it is empty. {{name}} - handle name. {{file}} - file name. {{i}} - the number of scenarios of current entry points
                 entryOptions: {
                     "first": {
                         registerHandleScript: '', //Used for the first argument to the wp_register_script function.
                         registerHandleStyle: '', //Used for the first argument to the wp_register_style function.
+                        dependentHandleNameTemplate: '', //Inherited from the main setting.
+                        dependentHandleStyleNameTemplate: '', //Inherited from the main setting.
                         dependence: ['second'], //Sets the dependency of this script on another
                         dependenceCss: [], //Sets the dependency of this style on another
                         async: true, //Set the async attribute for this file only.
