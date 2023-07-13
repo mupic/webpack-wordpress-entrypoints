@@ -38,6 +38,7 @@ function webpackWpEntrypoints(options){
 				gutenberg: false, //Does not inherit the values of the main options.
 				footer: false, //Does not inherit the values of the main options. Works with theme only.
 				conditions: `true`, //wordpress functions are inserted into the "if ({{conditions}})" check condition
+				dependence: [],
 				variableTemplate: `{{styles}}`, //Template for generating output of styles: {{styles}} - inserts a variable with styles.
 			},
 		],
@@ -516,7 +517,8 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 
 					$stylesPhp = '';
 					$stylesPhp += "\tif(" + options.settings.conditions + "){\n";
-					$stylesPhp += "\t\twp_register_style('wwe_critical_styles-" + key + "', false, false, false, true);\n";
+					let depString = (() => options.settings.dependence && options.settings.dependence.length && "'" + options.settings.dependence.join("','") + "'" || '')();
+					$stylesPhp += "\t\twp_register_style('wwe_critical_styles-" + key + "', false, array("+ depString +"), false, true);\n";
 					$stylesPhp += "\t\twp_add_inline_style('wwe_critical_styles-" + key + "', " + applyTemplate(options.settings.variableTemplate, {styles: options.variable}) + ");\n";
 					$stylesPhp += "\t\twp_enqueue_style('wwe_critical_styles-" + key + "');\n";
 					$stylesPhp += "\t}";
