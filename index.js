@@ -40,6 +40,7 @@ function webpackWpEntrypoints(options){
 				conditions: `true`, //wordpress functions are inserted into the "if ({{conditions}})" check condition
 				dependence: [],
 				variableTemplate: `{{styles}}`, //Template for generating output of styles: {{styles}} - inserts a variable with styles.
+				registerHandleStyle: null, //If set, automatic inclusion on the page will be skipped.
 			},
 		],
 		customFiles: {
@@ -194,9 +195,11 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			let value = JSON.parse(JSON.stringify(values[1]));
 			let valueAssets = !isWebpack4? value.assets.map(({name}) => name) : value.assets;
 			let mainFileIndex = value.assets.length - 1;
+			let mainFile = valueAssets[mainFileIndex];
 			let mainStyleFileIndex = valueAssets.reduce((result, src, fileIndex) => {
 				return /\.css$/i.test(src)? fileIndex : result;
 			}, false);
+			let mainStyleFile = valueAssets[mainStyleFileIndex];
 			let entryOptions = typeof this.options.entryOptions[key] != 'undefined'? this.options.entryOptions[key] : {};
 			let customDependence = entryOptions && typeof entryOptions.dependence != 'undefined' && (Array.isArray(entryOptions.dependence)? entryOptions.dependence : []) || undefined;
 			let customDependenceCss = entryOptions && typeof entryOptions.dependenceCss != 'undefined' && (Array.isArray(entryOptions.dependenceCss)? entryOptions.dependenceCss : []) || undefined;
@@ -218,8 +221,8 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 			if(!excludeScripts){
 				script = {
 					name: registerHandleScript || key,
-					original_file: valueAssets[mainFileIndex],
-					file: path.join(output, valueAssets[mainFileIndex]).replace(/\\/g, '/'),
+					original_file: mainFile,
+					file: path.join(output, mainFile).replace(/\\/g, '/'),
 					dependent: [], //The scripts on which the main depends
 					customDependent: typeof customDependence != 'undefined'? customDependence : this.options.dependence,
 					async: isBool(entryOptions.async)? entryOptions.async : this.options.async,
@@ -235,18 +238,26 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 				scripts.push(script);
 
 				if(mainStyleFileIndex !== false){
-					style = {
-						name: registerHandleStyle || key,
-						original_file: valueAssets[mainStyleFileIndex],
-						file: path.join(output, valueAssets[mainStyleFileIndex]).replace(/\\/g, '/'),
-						dependent: [], //The styles on which the main depends
-						customDependent: typeof customDependenceCss != 'undefined'? customDependenceCss : this.options.dependenceCss,
-						admin: isBool(entryOptions.adminCss) || entryOptions.adminCss === null? entryOptions.adminCss : (entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
-						gutenberg: isBool(entryOptions.gutenbergCss) || entryOptions.gutenbergCss === null? entryOptions.gutenbergCss : (entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
-						theme: isBool(entryOptions.themeCss) || entryOptions.themeCss === null? entryOptions.themeCss : (entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
-					};
-
-					styles.push(style);
+					let skipStyle = false;
+					for(let index in self.options.criticalStyles){ //skip critical styles
+						if(criticalStyles[index] && (criticalStyles[index].files[mainStyleFile])){
+							skipStyle = true;
+							break;
+						}
+					}
+					if(!skipStyle){
+						style = {
+							name: registerHandleStyle || key,
+							original_file: mainStyleFile,
+							file: path.join(output, mainStyleFile).replace(/\\/g, '/'),
+							dependent: [], //The styles on which the main depends
+							customDependent: typeof customDependenceCss != 'undefined'? customDependenceCss : this.options.dependenceCss,
+							admin: isBool(entryOptions.adminCss) || entryOptions.adminCss === null? entryOptions.adminCss : (entryOptions.admin !== undefined? entryOptions.admin : this.options.adminCss),
+							gutenberg: isBool(entryOptions.gutenbergCss) || entryOptions.gutenbergCss === null? entryOptions.gutenbergCss : (entryOptions.gutenberg !== undefined? entryOptions.gutenberg : this.options.gutenbergCss),
+							theme: isBool(entryOptions.themeCss) || entryOptions.themeCss === null? entryOptions.themeCss : (entryOptions.theme !== undefined? entryOptions.theme : this.options.themeCss),
+						};
+						styles.push(style);
+					}
 				}
 			}
 
@@ -515,13 +526,21 @@ webpackWpEntrypoints.prototype.apply = function(compiler){
 					if(!source)
 						return;
 
+					let registerHandleStyle = criticalStyles[key]?.settings?.registerHandleStyle;
+					let handleStyleTemplate = `wwe_critical_styles-" + ${key}`;
+					if(registerHandleStyle){
+						handleStyleTemplate = registerHandleStyle;
+					}
+
 					$stylesPhp = '';
-					$stylesPhp += "\tif(" + options.settings.conditions + "){\n";
+					$stylesPhp += `\tif(${options.settings.conditions}){\n`;
 					let depString = (() => options.settings.dependence && options.settings.dependence.length && "'" + options.settings.dependence.join("','") + "'" || '')();
-					$stylesPhp += "\t\twp_register_style('wwe_critical_styles-" + key + "', false, array("+ depString +"), false, true);\n";
-					$stylesPhp += "\t\twp_add_inline_style('wwe_critical_styles-" + key + "', " + applyTemplate(options.settings.variableTemplate, {styles: options.variable}) + ");\n";
-					$stylesPhp += "\t\twp_enqueue_style('wwe_critical_styles-" + key + "');\n";
-					$stylesPhp += "\t}";
+					$stylesPhp += `\t\twp_register_style('${handleStyleTemplate}', false, array(${depString}), false, true);\n`;
+					$stylesPhp += `\t\twp_add_inline_style('${handleStyleTemplate}', ${applyTemplate(options.settings.variableTemplate, {styles: options.variable})});\n`;
+					if(!registerHandleStyle){
+						$stylesPhp += `\t\twp_enqueue_style('${handleStyleTemplate}');\n`;
+					}
+					$stylesPhp += `\t}`;
 
 					blob += "" +
 						options.variable + " = <<<TEXT\n" +

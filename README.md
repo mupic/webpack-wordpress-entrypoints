@@ -63,6 +63,7 @@ module.exports = (env, argv) => {
                           footer: false, //Does not inherit the values of the main options. Works with theme only.
                           conditions: `is_front_page() || is_archive()`, //wordpress functions are inserted into the "if ({{conditions}})" check condition
                           variableTemplate: undefined, //Template for generating output of styles: {{styles}} - inserts a variable with styles.
+                          registerHandleStyle: null, //If set, automatic inclusion on the page will be skipped.
                      }
                 ],
                 customFiles: { //You can connect your own custom scripts.
